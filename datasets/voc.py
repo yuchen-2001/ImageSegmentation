@@ -3,6 +3,7 @@ import sys
 import tarfile
 import collections
 import torch.utils.data as data
+from torchvision import transforms
 import shutil
 import numpy as np
 
@@ -88,7 +89,12 @@ class VOCSegmentation(data.Dataset):
         """
         # TODO Problem 1.1
         # =================================================
-        raise NotImplementedError
+        img = Image.open(self.images[index]).convert("RGB")
+        mask = Image.open(self.masks[index])
+        if self.transform is not None:
+            img, mask = self.transform(img, mask)
+
+        return img, mask
 
     def __len__(self):
         return len(self.images)
@@ -98,5 +104,13 @@ class VOCSegmentation(data.Dataset):
         """decode semantic mask to RGB image for visualization, using the color map"""
         # TODO Problem 1.1
         # =================================================
-        raise NotImplementedError
+        raise Image.fromarray(cls.cmap[mask.numpy()])
         # =================================================
+
+    def transform(img, mask):
+        composed_transforms = transforms.Compose([
+            # Add your desired transformations here
+            # e.g., transforms.Resize(), transforms.ToTensor(), etc.
+            transforms.ToTensor()
+        ])
+        return composed_transforms(img), composed_transforms(mask)
