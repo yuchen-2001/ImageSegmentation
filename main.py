@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 
 from torch.utils import data
+from torch.optim import SGD
 from datasets import VOCSegmentation
 from utils import ext_transforms as et
 from metrics import StreamSegMetrics
@@ -171,7 +172,7 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
 def main():
     opts = get_argparser().parse_args()
     # TODO: you should fill the num_classes here. Don't forget to add the background class
-    opts.num_classes = 
+    opts.num_classes = 21
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opts.gpu_id
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -208,21 +209,24 @@ def main():
     # Set up optimizer 
     # TODO Problem 3.1
     # please check argument parser for learning rate reference.
-    raise NotImplementedError
-    optimizer = 
+    optimizer = SGD(
+        model.parameters(),
+        lr=0.05,
+        momentum=0.9,
+        weight_decay=4e-5,
+        nesterov=True
+    )
 
     # Set up Learning Rate Policy
     # TODO Problem 3.1
     # please check argument parser for learning rate policy.
-    raise NotImplementedError
-    scheduler = 
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.94)
 
     # Set up criterion 
     # TODO Problem 3.1
     # please check argument parser for loss function.
     # in 3.3, please use CrossEntropyLoss and in 3.4, use the custom loss defined in utils/loss.py
-    raise NotImplementedError
-    criterion = 
+    criterion = nn.CrossEntropyLoss(ignore_index=255)
     
     def save_ckpt(path):
         """ save current model
@@ -284,7 +288,11 @@ def main():
 
             # TODO Please finish the main training loop and record the mIoU
             # Problem 3.3 & Problem 3.4
-            raise NotImplementedError
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
             np_loss = loss.detach().cpu().numpy()
             interval_loss += np_loss
@@ -312,9 +320,10 @@ def main():
 
         print(metrics.to_str(val_score))
         # TODO record mIoU with mIoU_per_epoch 
-        raise NotImplementedError
+        mIoU_per_epoch.append(val_score['Mean IoU'])
+        print("mIoU for epoch {}: {}".format(cur_epochs, val_score['Mean IoU']))
 
-        if val_score['Mean IoU'] > best_score:  # save best model
+    if val_score['Mean IoU'] > best_score:  # save best model
             best_score = val_score['Mean IoU']
             print("new best mIOU: ", best_score)
             save_ckpt('checkpoints/best_%s_%s_os%d.pth' %

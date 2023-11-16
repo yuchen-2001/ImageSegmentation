@@ -104,8 +104,9 @@ class VOCSegmentation(data.Dataset):
         """decode semantic mask to RGB image for visualization, using the color map"""
         # TODO Problem 1.1
         # =================================================
-        raise Image.fromarray(cls.cmap[mask.numpy()])
+        image = Image.fromarray(cls.cmap[mask.numpy()])
         # =================================================
+        return image
 
     def transform(img, mask):
         composed_transforms = transforms.Compose([
