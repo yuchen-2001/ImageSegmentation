@@ -209,18 +209,18 @@ def main():
     # Set up optimizer 
     # TODO Problem 3.1
     # please check argument parser for learning rate reference.
-    optimizer = SGD(
-        model.parameters(),
-        lr=0.05,
+    optimizer = torch.optim.SGD(
+        params=[
+        {'params': model.backbone.parameters(), 'lr': 0.1 * opts.lr},
+        {'params': model.classifier.parameters(), 'lr': opts.lr}],
+        lr=opts.lr,
         momentum=0.9,
-        weight_decay=4e-5,
-        nesterov=True
-    )
+        weight_decay=opts.weight_decay)
 
     # Set up Learning Rate Policy
     # TODO Problem 3.1
     # please check argument parser for learning rate policy.
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.94)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.step_size, gamma=0.1)
 
     # Set up criterion 
     # TODO Problem 3.1
@@ -328,6 +328,7 @@ def main():
             print("new best mIOU: ", best_score)
             save_ckpt('checkpoints/best_%s_%s_os%d.pth' %
                         (opts.model, "VOC", opts.output_stride))
+    print(mIoU_per_epoch)
 
 if __name__ == '__main__':
     main()

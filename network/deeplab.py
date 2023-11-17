@@ -1,10 +1,8 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-
 from .utils import _SimpleSegmentationModel
-from collections import OrderedDict
-
+import network.backbone.resnet
 __all__ = ["DeepLabV3"]
 
 
@@ -39,10 +37,11 @@ class ASPP(nn.Module):
     def __init__(self, in_channels, atrous_rates, out_channels=256):
         super(ASPP, self).__init__()
 
+        modules = []
         # 1 - Conv2d has k1x1 s1
-        modules = [nn.Sequential(nn.Conv2d(in_channels, out_channels, 1, bias=False),
+        modules.append(nn.Sequential(nn.Conv2d(in_channels, out_channels, 1, bias=False),
                                  nn.BatchNorm2d(out_channels),
-                                 nn.ReLU())]
+                                 nn.ReLU()))
 
         # 2-4 - Conv2d have k3x3 s1 with different rate
         for i in range(len(atrous_rates)):
@@ -53,13 +52,13 @@ class ASPP(nn.Module):
         modules.append(ASPPPooling(in_channels, out_channels))
 
         self.convs = nn.ModuleList(modules)
-
+        dropout_rate = 0.1
         # 7 - final conv2d with dropout
         self.project = nn.Sequential(
             nn.Conv2d(len(self.convs) * out_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(),
-            nn.Dropout(p=0.5)
+            nn.Dropout(p=dropout_rate)
         )
 
     def forward(self, x):
@@ -120,11 +119,11 @@ class DeepLabHead(nn.Module):
         #   in_channels: number of input channels
         #   num_classes: number of classes for prediction
         #   aspp_dilate: atrous_rates for ASPP
-        #   
+        #
         # ================================================================================ #
         channels = 256
         self.aspp = ASPP(in_channels, atrous_rates=aspp_dilate)
-        self.global_avg_pooling = nn.AdaptiveAvgPool2d(1)
+        # self.global_avg_pooling = nn.AdaptiveAvgPool2d(1)
         self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(channels)
         self.relu1 = nn.ReLU()
@@ -133,7 +132,7 @@ class DeepLabHead(nn.Module):
 
     def forward(self, feature):
         x = self.aspp(feature)
-        x = self.global_avg_pooling(x)
+        # x = self.global_avg_pooling(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu1(x)
@@ -150,6 +149,7 @@ class DeepLabHead(nn.Module):
 
 
 class DeepLabHeadV3Plus(nn.Module):
+    # in_channels = 256, low_level_channels = 2048
     def __init__(self, in_channels, low_level_channels, num_classes, aspp_dilate=[12, 24, 36]):
         super(DeepLabHeadV3Plus, self).__init__()
         # TODO Problem 2.2
@@ -158,17 +158,18 @@ class DeepLabHeadV3Plus(nn.Module):
         #   low_level_channels: number of channels for project
         #   num_classes: number of classes for prediction
         #   aspp_dilate: atrous_rates for ASPP
-        #   
+        #
         # ================================================================================ #
-        self.project = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels + 48, kernel_size=1, bias=False),
-            nn.BatchNorm2d(in_channels + 48),
+
+        self.low = nn.Sequential(
+            nn.Conv2d(in_channels, low_level_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(low_level_channels),
             nn.ReLU()
         )
 
-        self.aspp = ASPP(in_channels=in_channels+48, atrous_rates=aspp_dilate)
+        self.aspp = ASPP(in_channels=low_level_channels, atrous_rates=aspp_dilate)
 
-        self.conv1 = nn.Conv2d(2352, 256, kernel_size=1, bias=False)
+        self.conv1 = nn.Conv2d(512, 256, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(256)
         self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(256, num_classes, kernel_size=1)
@@ -176,17 +177,24 @@ class DeepLabHeadV3Plus(nn.Module):
         self._init_weight()
 
     def forward(self, feature):
-        low_level_feature = self.project(feature)
-        #print("Low-level feature shape:", low_level_feature.shape)
-        x = torch.cat([self.aspp(low_level_feature), low_level_feature], dim=1)
-        #print("Output of ASPP shape:", self.aspp(low_level_feature).shape)
-        #print("Concatenated output shape:", x.shape)
+        # print(feature.size()) # (8, 2048, 33, 33)
+        low_level_feature = self.low(feature) # (8, 256, 33, 33)
+        # print("Low-level feature shape:", low_level_feature.shape)
+        out_feature = self.aspp(low_level_feature)
+
+        # print("out feature shape:", out_feature.shape) # (8, 256, 33, 33)
+        x = torch.cat([out_feature, low_level_feature], dim=1)
+        # print("Output of ASPP shape:", self.aspp(low_level_feature).shape) # (8, 256, 33, 33)
+        # print("Concatenated output shape:", x.shape) # (8, 512, 33, 33)
 
         x = self.conv1(x)
+        # print("conv1 shape:", x.shape) # (8, 256, 33, 33)
         x = self.bn1(x)
+        # print("bn1 shape:", x.shape) # (8, 256, 33, 33)
         x = self.relu1(x)
+        # print("relu1 shape:", x.shape) # (8, 256, 33, 33)
         x = self.conv2(x)
-        #print("Final output shape:", x.shape)
+        # print("Final output shape:", x.shape) # (8, 21, 33, 33)
         return x
 
 
