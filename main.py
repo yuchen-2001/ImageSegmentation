@@ -227,8 +227,10 @@ def main():
     # TODO Problem 3.1
     # please check argument parser for loss function.
     # in 3.3, please use CrossEntropyLoss and in 3.4, use the custom loss defined in utils/loss.py
-    # criterion = nn.CrossEntropyLoss(ignore_index=255)
-    criterion = utils.CustomCombinedLoss()
+    if opts.loss_type == "custom":
+        criterion = utils.CustomCombinedLoss()
+    else:
+        criterion = nn.CrossEntropyLoss(ignore_index=255)
 
     def save_ckpt(path):
         """ save current model

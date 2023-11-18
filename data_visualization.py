@@ -102,8 +102,8 @@ def plot_images_side_by_side(image_folder):
 
 
 if __name__ == '__main__':
-    #plot_mIoU_CE()
-    #plot_mIoU_Custom()
+    plot_mIoU_CE()
+    plot_mIoU_Custom()
 
     image_folder = "datasets/Vis/RGBimages"
 

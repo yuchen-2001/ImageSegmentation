@@ -100,7 +100,6 @@ def save_images_with_boxes(image_data_list, output_folder):
 
 
 if __name__ == "__main__":
-    #folder_path = "data/VOCdevkit/VOC2012/Annotations/"
     folder_path = "Vis/"
     all_xml_data = []
     num_of_images = 20
