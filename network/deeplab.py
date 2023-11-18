@@ -161,42 +161,39 @@ class DeepLabHeadV3Plus(nn.Module):
         #
         # ================================================================================ #
 
-        self.low = nn.Sequential(
-            nn.Conv2d(in_channels, low_level_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(low_level_channels),
+        self.project = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels + 48, kernel_size=1, bias=False),
+            nn.BatchNorm2d(in_channels + 48),
             nn.ReLU()
         )
 
-        self.aspp = ASPP(in_channels=low_level_channels, atrous_rates=aspp_dilate)
+        self.aspp = ASPP(in_channels=in_channels + 48, atrous_rates=aspp_dilate)
 
-        self.conv1 = nn.Conv2d(512, 256, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
+        self.conv1 = nn.Conv2d(2352, 1024, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(1024)
         self.relu1 = nn.ReLU()
+        self.conv1extra = nn.Conv2d(1024, 256, kernel_size=1, bias=False)
+        self.bn1extra = nn.BatchNorm2d(256)
+        self.relu1extra = nn.ReLU()
         self.conv2 = nn.Conv2d(256, num_classes, kernel_size=1)
 
         self._init_weight()
 
-    def forward(self, feature):
-        # print(feature.size()) # (8, 2048, 33, 33)
-        low_level_feature = self.low(feature) # (8, 256, 33, 33)
-        # print("Low-level feature shape:", low_level_feature.shape)
-        out_feature = self.aspp(low_level_feature)
 
-        # print("out feature shape:", out_feature.shape) # (8, 256, 33, 33)
-        x = torch.cat([out_feature, low_level_feature], dim=1)
-        # print("Output of ASPP shape:", self.aspp(low_level_feature).shape) # (8, 256, 33, 33)
-        # print("Concatenated output shape:", x.shape) # (8, 512, 33, 33)
+    def forward(self, feature):
+        low_level_feature = self.project(feature)
+        # print("Low-level feature shape:", low_level_feature.shape)
+        x = torch.cat([self.aspp(low_level_feature), low_level_feature], dim=1)
+        # print("Output of ASPP shape:", self.aspp(low_level_feature).shape)
+        # print("Concatenated output shape:", x.shape)
 
         x = self.conv1(x)
-        # print("conv1 shape:", x.shape) # (8, 256, 33, 33)
         x = self.bn1(x)
-        # print("bn1 shape:", x.shape) # (8, 256, 33, 33)
         x = self.relu1(x)
-        # print("relu1 shape:", x.shape) # (8, 256, 33, 33)
+        x = self.relu1extra(self.bn1extra(self.conv1extra(x)))
         x = self.conv2(x)
-        # print("Final output shape:", x.shape) # (8, 21, 33, 33)
+        # print("Final output shape:", x.shape)
         return x
-
 
     def _init_weight(self):
             for m in self.modules():

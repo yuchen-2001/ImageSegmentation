@@ -226,8 +226,9 @@ def main():
     # TODO Problem 3.1
     # please check argument parser for loss function.
     # in 3.3, please use CrossEntropyLoss and in 3.4, use the custom loss defined in utils/loss.py
-    criterion = nn.CrossEntropyLoss(ignore_index=255)
-    
+    # criterion = nn.CrossEntropyLoss(ignore_index=255)
+    criterion = utils.CustomCombinedLoss()
+
     def save_ckpt(path):
         """ save current model
         """
@@ -276,59 +277,63 @@ def main():
 
     interval_loss = 0
     mIoU_per_epoch = []
-    while True:  # cur_itrs < opts.total_itrs:
-        # =====  Train  =====
-        model.train()
-        cur_epochs += 1
-        for (images, labels) in train_loader:
-            cur_itrs += 1
+    with open("mIoU_per_epoch_Custom.txt", "w") as mIoU_file:
+        while True:  # cur_itrs < opts.total_itrs:
+            # =====  Train  =====
+            model.train()
+            cur_epochs += 1
+            for (images, labels) in train_loader:
+                cur_itrs += 1
 
-            images = images.to(device, dtype=torch.float32)
-            labels = labels.to(device, dtype=torch.long)
+                images = images.to(device, dtype=torch.float32)
+                labels = labels.to(device, dtype=torch.long)
 
-            # TODO Please finish the main training loop and record the mIoU
-            # Problem 3.3 & Problem 3.4
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+                # TODO Please finish the main training loop and record the mIoU
+                # Problem 3.3 & Problem 3.4
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-            np_loss = loss.detach().cpu().numpy()
-            interval_loss += np_loss
+                np_loss = loss.detach().cpu().numpy()
+                interval_loss += np_loss
 
-            if (cur_itrs) % 10 == 0:
-                interval_loss = interval_loss / 10
-                print("Epoch %d, Itrs %d/%d, Loss=%f" %
-                      (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
-                interval_loss = 0.0
-            
-            scheduler.step()
+                if (cur_itrs) % 10 == 0:
+                    interval_loss = interval_loss / 10
+                    print("Epoch %d, Itrs %d/%d, Loss=%f" %
+                          (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
+                    interval_loss = 0.0
 
-            if cur_itrs >= opts.total_itrs:
-                return
+                scheduler.step()
 
-        # evaluation after each epoch
-        save_ckpt('checkpoints/latest_%s_%s_os%d.pth' %
-                    (opts.model, "VOC", opts.output_stride))
-    
-        print("validation...")
-        model.eval()
-        val_score, ret_samples = validate(
-            opts=opts, model=model, loader=val_loader, device=device, metrics=metrics,
-            ret_samples_ids=vis_sample_id)
+                if cur_itrs >= opts.total_itrs:
+                    print("The final mIoU per epoch:")
+                    print(mIoU_per_epoch)
+                    return
 
-        print(metrics.to_str(val_score))
-        # TODO record mIoU with mIoU_per_epoch 
-        mIoU_per_epoch.append(val_score['Mean IoU'])
-        print("mIoU for epoch {}: {}".format(cur_epochs, val_score['Mean IoU']))
-
-    if val_score['Mean IoU'] > best_score:  # save best model
-            best_score = val_score['Mean IoU']
-            print("new best mIOU: ", best_score)
-            save_ckpt('checkpoints/best_%s_%s_os%d.pth' %
+            # evaluation after each epoch
+            save_ckpt('checkpoints/latest_%s_%s_os%d.pth' %
                         (opts.model, "VOC", opts.output_stride))
-    print(mIoU_per_epoch)
+
+            print("validation...")
+            model.eval()
+            val_score, ret_samples = validate(
+                opts=opts, model=model, loader=val_loader, device=device, metrics=metrics,
+                ret_samples_ids=vis_sample_id)
+
+            print(metrics.to_str(val_score))
+            # TODO record mIoU with mIoU_per_epoch
+            mIoU_per_epoch.append(val_score['Mean IoU'])
+            print("mIoU for epoch {}: {}".format(cur_epochs, val_score['Mean IoU']))
+            mIoU_file.write("Epoch {}: mIoU = {}\n".format(cur_epochs, val_score['Mean IoU']))
+
+            if val_score['Mean IoU'] > best_score:  # save best model
+                    best_score = val_score['Mean IoU']
+                    print("new best mIOU: ", best_score)
+                    save_ckpt('checkpoints/best_%s_%s_os%d.pth' % (opts.model, "VOC", opts.output_stride))
+
+
 
 if __name__ == '__main__':
     main()
