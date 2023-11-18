@@ -73,6 +73,9 @@ class VOCSegmentation(data.Dataset):
         
         self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
         self.masks = [os.path.join(mask_dir, x + ".png") for x in file_names]
+        self.paths = []
+        for x in file_names:
+            self.paths.append(x)
         assert (len(self.images) == len(self.masks))
 
     def __getitem__(self, index):
@@ -91,10 +94,11 @@ class VOCSegmentation(data.Dataset):
         # =================================================
         img = Image.open(self.images[index]).convert("RGB")
         mask = Image.open(self.masks[index])
+        path = self.paths[index]
         if self.transform is not None:
             img, mask = self.transform(img, mask)
 
-        return img, mask
+        return img, mask, path
 
     def __len__(self):
         return len(self.images)

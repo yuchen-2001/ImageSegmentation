@@ -4,25 +4,18 @@ import torch
 
 # =========================== Define your custom loss function ===========================================
 class CustomCombinedLoss(nn.Module):
-    def __init__(self, alpha=0.5, beta=0.5, gamma=2, size_average=True, ignore_index=255):
+    def __init__(self):
         super(CustomCombinedLoss, self).__init__()
-        self.alpha = alpha
-        self.beta = beta
-        self.gamma = gamma
-        self.ignore_index = ignore_index
-        self.size_average = size_average
+        self.alpha = 1
+        self.gamma = 1
+        self.ignore_index = 255
+        self.size_average = True
 
     def forward(self, inputs, targets):
-        # CrossEntropyLoss for the main prediction
-        ce_loss = F.cross_entropy(
-            inputs, targets, reduction='none', ignore_index=self.ignore_index)
-        focal_loss = self.alpha * (1 - torch.exp(-ce_loss)) ** self.gamma * ce_loss
-        ce_loss = self.beta * focal_loss
-
-        # Combine losses
-        combined_loss = focal_loss.sum()
-
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none', ignore_index=self.ignore_index)
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
         if self.size_average:
             return focal_loss.mean()
         else:
-            return focal_loss
+            return focal_loss.sum()
